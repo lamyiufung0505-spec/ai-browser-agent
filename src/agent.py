@@ -163,7 +163,7 @@ def _ask_vision(client, image_path: str) -> str:
     return resp.choices[0].message.content.strip()
 
 
-def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: bool = False) -> str:
+def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: bool = False, on_step=None) -> str:
     if not DEEPSEEK_API_KEY:
         return "❌ 未设置 DEEPSEEK_API_KEY，请在 .env 里填入你的 DeepSeek key。"
 
@@ -200,6 +200,8 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
             # (a) 拦截页检测：网站返回 403 / Forbidden 等反爬拦截，根本读不到数据
             if ("403" in cur_texts and "Forbid" in cur_texts) or "Forbid_code" in cur_texts:
                 history.append("⚠️ 当前页面被网站拦截（403 Forbidden），这里读不到任何任务数据。")
+                if on_step:
+                    on_step(step, history[-1])
                 stuck_hint = (
                     "【紧急提醒】你正停留在一个被拦截的页面（403），无论怎么刷新/重导航都读不到数据。"
                     "立即 go_back 返回搜索页，改用【页面文字（参考）】里的搜索摘要作答；"
@@ -212,6 +214,8 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
                 history.append(
                     f"⚠️ 上一步（{last_act} #{last_elem}）执行后页面无任何变化，请勿重复无效操作。"
                 )
+                if on_step:
+                    on_step(step, history[-1])
                 key = (last_act, last_elem)
                 repeat_count[key] = repeat_count.get(key, 0) + 1
                 if repeat_count[key] >= 2:
@@ -254,6 +258,8 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
             if not action:
                 print(f"  ⚠️ 第 {step} 步：模型未返回合法 JSON，跳过。原始：{raw[:120]}")
                 history.append(f"[step {step}] (解析失败）")
+                if on_step:
+                    on_step(step, history[-1])
                 continue
 
             act = action.get("action")
@@ -275,9 +281,13 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
                         f"任务尚未完成。请继续获取缺失对象的数据：回到搜索页再搜下一个城市/对象，"
                         f"或直接 navigate 到对应页面，拿齐全部数据并按要求对比后再 done。绝对不要再次提交这种半成品。"
                     )
+                    if on_step:
+                        on_step(step, history[-1])
                     continue
                 result = done_ans
                 history.append(f"[step {step}] done -> {result[:80]}")
+                if on_step:
+                    on_step(step, history[-1])
                 print(f"  ✅ 任务完成")
                 break
 
@@ -292,6 +302,8 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
                 if act == "click":
                     browser.click(action["element_id"])
                     history.append(f"[step {step}] click #{action['element_id']}")
+                    if on_step:
+                        on_step(step, history[-1])
                 elif act == "type":
                     browser.type(
                         action["element_id"],
@@ -299,44 +311,64 @@ def run(task: str, start_url: str = None, max_steps: int = MAX_STEPS, headless: 
                         submit=bool(action.get("submit", False)),
                     )
                     history.append(f"[step {step}] type #{action['element_id']}: {action.get('text','')[:40]}")
+                    if on_step:
+                        on_step(step, history[-1])
                 elif act == "scroll":
                     browser.scroll(action.get("direction", "down"))
                     history.append(f"[step {step}] scroll {action.get('direction','down')}")
+                    if on_step:
+                        on_step(step, history[-1])
                 elif act == "navigate":
                     url = action.get("url", "")
                     if url.startswith("http"):
                         browser.navigate(url)
                         history.append(f"[step {step}] navigate -> {url}")
+                        if on_step:
+                            on_step(step, history[-1])
                     else:
                         print(f"  ⚠️ navigate 被拒绝（非 http 网址）：{url}")
                         history.append(f"[step {step}] (navigate 拒绝：{url})")
+                        if on_step:
+                            on_step(step, history[-1])
                 elif act == "go_back":
                     browser.go_back()
                     history.append(f"[step {step}] go_back")
+                    if on_step:
+                        on_step(step, history[-1])
                 elif act == "solve_captcha":
                     img = action.get("image_id")
                     inp = action.get("input_id")
                     if img is None or inp is None:
                         print(f"  ⚠️ solve_captcha 缺少 image_id 或 input_id")
                         history.append(f"[step {step}] (solve_captcha 参数缺失)")
+                        if on_step:
+                            on_step(step, history[-1])
                     else:
                         try:
                             path = browser.screenshot_element(img)
                             ans = _ask_vision(vclient, path)
                             browser.type(inp, ans, submit=False)
                             history.append(f"[step {step}] solve_captcha 识别答案={ans} 已填入 #{inp}")
+                            if on_step:
+                                on_step(step, history[-1])
                             skip_sig = True  # 填验证码不改变元素签名，跳过一次无变化检测避免误报
                         except Exception as ve:  # noqa: BLE001
                             vmsg = str(ve).split("\n")[0][:120]
                             print(f"  ⚠️ 第 {step} 步 solve_captcha 失败：{vmsg}")
                             history.append(f"[step {step}] solve_captcha 失败：{vmsg}")
+                            if on_step:
+                                on_step(step, history[-1])
                 else:
                     print(f"  ⚠️ 未知动作：{act}")
                     history.append(f"[step {step}] (未知动作 {act})")
+                    if on_step:
+                        on_step(step, history[-1])
             except Exception as e:  # noqa: BLE001
                 msg = str(e).split("\n")[0][:120]
                 print(f"  ⚠️ 第 {step} 步执行失败：{msg}")
                 history.append(f"[step {step}] {act} #{action.get('element_id','?')} 执行失败：{msg}")
+                if on_step:
+                    on_step(step, history[-1])
 
             # 以“执行前”的页面状态作为下一步比较基线
             # （solve_captcha 只填输入框、不改变元素签名，跳过一次无变化检测避免误报）
