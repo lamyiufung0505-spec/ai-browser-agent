@@ -63,6 +63,16 @@ copy .env.example .env          # Windows
 .venv\Scripts\python.exe -m src.cli run "..." --headless
 ```
 
+## 网页界面
+
+项目也提供了 Gradio 网页界面，输入任务和参数后，Agent 会自动执行，并在页面右侧实时展示每一步的过程日志：
+
+```bash
+.venv\Scripts\python.exe -m src.web
+```
+
+启动后浏览器打开 `http://localhost:7860` 即可使用。
+
 ## 支持的动作
 
 | action | 说明 |
