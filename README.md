@@ -33,12 +33,22 @@
 ## 安装
 
 ```bash
+# 1) 克隆仓库
+git clone https://github.com/lamyiufung0505-spec/ai-browser-agent.git
+cd ai-browser-agent
+
+# 2) 创建虚拟环境并装依赖（ Windows 用 .venv\Scripts\python.exe，Mac/Linux 用 .venv/bin/python ）
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m playwright install chromium   # 首次需下载浏览器
+.venv\Scripts\python.exe -m playwright install chromium   # 首次需下载浏览器内核
+
+# 3) 配置密钥：把仓库里的 .env.example 复制成 .env，填入你的 Key
+copy .env.example .env          # Windows
+# cp .env.example .env          # Mac / Linux
 ```
 
-在 `.env` 里填入你的 `DEEPSEEK_API_KEY`（复用 ai-hedge-fund 的同一个 key 即可）。
+在 `.env` 里填入 `DEEPSEEK_API_KEY`（申请：https://platform.deepseek.com/）。
+普通任务只填这一个即可；只有需要"识别图片验证码"时才填 VISION_* 三项（详见 .env.example 注释）。
 
 ## 使用
 
@@ -63,6 +73,7 @@ python -m venv .venv
 | `navigate` | 跳转网址（仅限 http/https） |
 | `go_back` | 返回上一页 |
 | `done` | 任务完成，返回答案 |
+| `solve_captcha` | 遇到图片形式验证码时，截图交给视觉模型识别后回填（需配置 VISION_*） |
 
 ## 安全说明
 
@@ -70,7 +81,18 @@ python -m venv .venv
 - `navigate` 只允许 http/https，禁止访问本地文件（`file://`）。
 - 运行在你的本机浏览器，建议先在"只读查阅类"任务上试用。
 
+## 最小可运行示例
+
+装好依赖、填好 `.env` 后，先用一个"只读查阅类"任务验证链路是否通：
+
+```bash
+.venv\Scripts\python.exe -m src.cli run "打开 https://example.com，告诉我页面主标题是什么"
+```
+
+能正常返回标题，说明安装成功。
+
 ## 局限
 
-- 纯文本观察，对"看截图/验证码/复杂视觉布局"无能为力（那是多模态 Agent 的方向）。
+- 默认纯文本观察，不依赖视觉模型即可跑大多数任务；遇到**图片形式验证码**时，可配置可选的视觉模型（见 `.env.example`）来识别。
 - 页面结构多变时可能点错；复杂任务可调大 `--max-steps`。
+- 不擅长需要登录态、滑块验证、或强反爬（如淘宝）的任务——这类建议先准备好登录态再跑。
