@@ -10,9 +10,8 @@
 
 | 项目 | 能力 |
 |---|---|
-| ai-travel-agent | 调用工具（搜索）给建议 |
-| ai-hedge-fund | 多 Agent 并行分析 |
-| ai-rag-qa | 检索文档后回答 |
+| [ai-travel-planner](https://github.com/lamyiufung0505-spec/ai-travel-planner) | 调用工具（搜索）给建议 |
+| [ai-rag-qa](https://github.com/lamyiufung0505-spec/ai-rag-qa) | 检索文档后回答 |
 | **ai-browser-agent** | **真正去网页上"做"事情**（点、输、翻、跳转） |
 
 前三个都是"说"，这个是"做"。
